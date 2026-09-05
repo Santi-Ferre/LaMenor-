@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adiviná la Canción</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #15111a;
+    --surface: #201a28;
+    --surface-2: #2a2233;
+    --gold: #f4c95d;
+    --gold-dim: #8a7136;
+    --green: #7fb77e;
+    --red: #e36262;
+    --cream: #f5f1e8;
+    --muted: #a99fb0;
+    --radius: 14px;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: radial-gradient(1200px 800px at 50% -10%, #241c2d 0%, var(--bg) 55%);
+    color: var(--cream);
+    font-family: 'Space Grotesk', sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    padding: 32px 16px;
+  }
+  .app{
+    width:100%;
+    max-width: 520px;
+  }
+  .eyebrow{
+    font-size: 13px;
+    color: var(--muted);
+    text-align:center;
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+  h1.brand{
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 32px;
+    text-align:center;
+    margin: 0 0 28px 0;
+    color: var(--cream);
+  }
+  .card{
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 28px;
+    border: 1px solid #33293e;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.6);
+  }
+
+  /* ---------- Start screen ---------- */
+  .field-label{
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display:block;
+  }
+  .search-row{
+    display:flex;
+    gap: 8px;
+  }
+  input[type=text]{
+    flex:1;
+    background: var(--surface-2);
+    border: 1px solid #3a3045;
+    color: var(--cream);
+    padding: 13px 14px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    outline: none;
+  }
+  input[type=text]:focus{ border-color: var(--gold-dim); }
+  button{
+    font-family: inherit;
+    cursor:pointer;
+    border:none;
+  }
+  .btn-primary{
+    background: var(--gold);
+    color: #201a10;
+    font-weight: 600;
+    padding: 13px 20px;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+  .btn-primary:disabled{ opacity: 0.5; cursor: default; }
+  .chips{
+    display:flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .chip{
+    background: var(--surface-2);
+    border: 1px solid #3a3045;
+    color: var(--muted);
+    padding: 7px 13px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+  .chip:hover{ color: var(--cream); border-color: var(--gold-dim); }
+
+  .mode-toggle{
+    display:flex;
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+  .mode-btn{
+    flex:1;
+    background: var(--surface-2);
+    border: 1px solid #3a3045;
+    color: var(--muted);
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 2px;
+  }
+  .mode-btn .mode-sub{
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+  .mode-btn.active{
+    background: rgba(244,201,93,0.12);
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+  .mode-btn.active .mode-sub{ color: var(--gold); opacity: 0.75; }
+
+  #rounds-picker{ margin-bottom: 22px; }
+  .rounds-chips{ margin-top: 0; margin-bottom: 12px; }
+  .chip.round-chip{ padding: 8px 14px; }
+  .chip.round-chip.active{
+    background: rgba(244,201,93,0.15);
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+  .custom-rounds-row{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .custom-rounds-row input{
+    width: 80px;
+    background: var(--surface-2);
+    border: 1px solid #3a3045;
+    color: var(--cream);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+  .custom-rounds-row input:focus{ border-color: var(--gold-dim); }
+
+  .status{
+    margin-top: 18px;
+    font-size: 14px;
+    color: var(--muted);
+    text-align:center;
+    min-height: 20px;
+  }
+  .status.err{ color: var(--red); }
+
+  /* ---------- Game screen ---------- */
+  .top-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom: 22px;
+    gap: 10px;
+  }
+  .artist-now-playing{
+    font-size: 12px;
+    color: var(--muted);
+    text-align:center;
+    margin-bottom: 10px;
+  }
+  .round-label{ font-size: 13px; color: var(--muted); }
+  .score-label{ font-size: 13px; color: var(--gold); font-weight: 600; flex:1; text-align:right; }
+  .btn-end{
+    background: var(--surface-2);
+    color: var(--muted);
+    border: 1px solid #3a3045;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+  }
+  .btn-end:hover{ color: var(--red); border-color: var(--red); }
+
+  .disc-wrap{
+    display:flex;
+    justify-content:center;
+    margin-bottom: 22px;
+  }
+  .disc{
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background:
+      repeating-radial-gradient(circle at center, #0c0a10 0px, #0c0a10 2px, #1c1721 3px, #1c1721 5px);
+    position: relative;
+    box-shadow: 0 10px 30px -8px rgba(0,0,0,0.7);
+    animation: spin 3.5s linear infinite;
+    animation-play-state: paused;
+  }
+  .disc.playing{ animation-play-state: running; }
+  .disc::after{
+    content:"";
+    position:absolute; top:50%; left:50%;
+    width: 34px; height: 34px;
+    background: var(--gold);
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+  }
+  .disc::before{
+    content:"";
+    position:absolute; top:50%; left:50%;
+    width: 8px; height: 8px;
+    background: var(--bg);
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+    z-index:2;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .transport{
+    display:flex;
+    justify-content:center;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .btn-round{
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--gold);
+    color: #201a10;
+    font-size: 20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .btn-round:disabled{ opacity:0.35; }
+  .btn-skip{
+    background: var(--surface-2);
+    color: var(--cream);
+    border: 1px solid #3a3045;
+    padding: 0 20px;
+    border-radius: 999px;
+    font-size: 14px;
+    height: 52px;
+  }
+  .btn-skip:disabled{ opacity:0.35; }
+
+  .timeline{
+    display:flex;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .tick{
+    flex:1;
+    height: 6px;
+    border-radius: 4px;
+    background: var(--surface-2);
+    overflow:hidden;
+  }
+  .tick .fill{
+    height:100%;
+    width:0%;
+    background: var(--gold);
+    transition: width 0.25s ease;
+  }
+  .tick.unlocked .fill{ width:100%; }
+  .tick.active .fill{ background: var(--cream); }
+  .stage-caption{
+    text-align:center;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .guess-box{ position: relative; }
+  .suggestions{
+    position:absolute;
+    top: calc(100% + 6px);
+    left:0; right:0;
+    background: var(--surface-2);
+    border: 1px solid #3a3045;
+    border-radius: 10px;
+    overflow:hidden;
+    z-index: 5;
+    max-height: 220px;
+    overflow-y:auto;
+  }
+  .suggestion{
+    padding: 11px 14px;
+    font-size: 14px;
+    cursor:pointer;
+    border-bottom: 1px solid #33293e;
+  }
+  .suggestion:last-child{ border-bottom:none; }
+  .suggestion:hover{ background:#352b40; }
+  .suggestion b{ color: var(--gold); }
+  .suggestion .artist{ color: var(--muted); font-size: 12px; display:block; margin-top:2px; }
+
+  /* ---------- Reveal ---------- */
+  .reveal{
+    display:flex;
+    gap: 16px;
+    align-items:center;
+    margin-bottom: 20px;
+  }
+  .reveal img{
+    width: 76px; height: 76px;
+    border-radius: 10px;
+    flex-shrink:0;
+  }
+  .reveal-text .title{
+    font-family:'Fraunces', serif;
+    font-size: 19px;
+    font-weight:600;
+    margin-bottom: 2px;
+  }
+  .reveal-text .artist{ color: var(--muted); font-size: 14px; }
+  .result-banner{
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    border-radius: 10px;
+  }
+  .result-banner.win{ background: rgba(127,183,126,0.15); color: var(--green); }
+  .result-banner.lose{ background: rgba(227,98,98,0.15); color: var(--red); }
+
+  .hidden{ display:none !important; }
+
+  .final .score-big{
+    font-family:'Fraunces', serif;
+    font-size: 52px;
+    font-weight: 700;
+    text-align:center;
+    color: var(--gold);
+    margin: 4px 0 2px 0;
+  }
+  .final .score-sub{
+    text-align:center;
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 22px;
+  }
+  .round-history{
+    display:flex;
+    flex-direction:column;
+    gap: 8px;
+    margin-bottom: 24px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .history-row{
+    display:flex;
+    justify-content:space-between;
+    font-size: 13px;
+    padding: 9px 12px;
+    background: var(--surface-2);
+    border-radius: 8px;
+  }
+  .history-row .pts{ color: var(--gold); font-weight:600; }
+
+  footer.credit{
+    text-align:center;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 18px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="eyebrow">Un juego para tu oído</div>
+  <h1 class="brand">Adiviná la Canción</h1>
+
+  <!-- START SCREEN -->
+  <div class="card" id="screen-start">
+    <label class="field-label">Modo de juego</label>
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="rounds">Por rondas<span class="mode-sub" id="rounds-mode-sub">5 canciones</span></button>
+      <button class="mode-btn" data-mode="infinite">Infinito<span class="mode-sub">jugá hasta que quieras</span></button>
+    </div>
+
+    <div id="rounds-picker">
+      <label class="field-label">Cantidad de rondas</label>
+      <div class="chips rounds-chips">
+        <button class="chip round-chip active" data-n="5">5</button>
+        <button class="chip round-chip" data-n="10">10</button>
+        <button class="chip round-chip" data-n="15">15</button>
+        <button class="chip round-chip" data-n="20">20</button>
+        <button class="chip round-chip" data-n="30">30</button>
+        <button class="chip round-chip" data-n="50">50</button>
+      </div>
+      <div class="custom-rounds-row">
+        <span>O elegí un número:</span>
+        <input type="number" id="rounds-custom" min="1" max="50" placeholder="1-50" />
+      </div>
+    </div>
+
+    <label class="field-label" for="query">Escribí el nombre de un artista</label>
+    <div class="search-row">
+      <input type="text" id="query" placeholder="Ej: Bizarrap, Tini, Soda Stereo, Bad Bunny..." />
+      <button class="btn-primary" id="btn-start">Buscar</button>
+    </div>
+    <div class="chips">
+      <button class="chip artist-chip" data-q="Duki">Duki</button>
+      <button class="chip artist-chip" data-q="Tini">Tini</button>
+      <button class="chip artist-chip" data-q="Bizarrap">Bizarrap</button>
+      <button class="chip artist-chip" data-q="Soda Stereo">Soda Stereo</button>
+      <button class="chip artist-chip" data-q="Bad Bunny">Bad Bunny</button>
+      <button class="chip artist-chip" data-q="Shakira">Shakira</button>
+    </div>
+    <div class="status" id="start-status"></div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div class="card hidden" id="screen-game">
+    <div class="artist-now-playing" id="artist-now-playing">Jugando con: —</div>
+    <div class="top-row">
+      <span class="round-label" id="round-label">Ronda 1 / 5</span>
+      <span class="score-label" id="score-label">0 pts</span>
+      <button class="btn-end" id="btn-end">Terminar</button>
+    </div>
+
+    <div class="disc-wrap"><div class="disc" id="disc"></div></div>
+
+    <div class="timeline" id="timeline"></div>
+    <div class="stage-caption" id="stage-caption">Escuchá 0.3 segundos y adiviná</div>
+
+    <div class="transport">
+      <button class="btn-round" id="btn-play" title="Reproducir">▶</button>
+      <button class="btn-skip" id="btn-skip">Saltar →</button>
+    </div>
+
+    <div class="guess-box">
+      <input type="text" id="guess-input" placeholder="Escribí el título de la canción..." autocomplete="off" />
+      <div class="suggestions hidden" id="suggestions"></div>
+    </div>
+
+    <div id="result-area"></div>
+  </div>
+
+  <!-- FINAL SCREEN -->
+  <div class="card hidden final" id="screen-final">
+    <div class="score-big" id="final-score">0</div>
+    <div class="score-sub">puntos en total</div>
+    <div class="round-history" id="round-history"></div>
+    <button class="btn-primary" id="btn-replay" style="width:100%;">Jugar de nuevo</button>
+  </div>
+
+  <footer class="credit">Canciones y previews de audio vía iTunes Search API</footer>
+</div>
+
+<script>
+(function(){
+  const STAGE_DURATIONS = [0.3, 1, 3, 7, 15]; // seconds unlocked, cumulative
+  const STAGE_POINTS = [50, 40, 30, 20, 10];
+  const ROUNDS = 5;
+
+  const screenStart = document.getElementById('screen-start');
+  const screenGame = document.getElementById('screen-game');
+  const screenFinal = document.getElementById('screen-final');
+  const startStatus = document.getElementById('start-status');
+  const queryInput = document.getElementById('query');
+  const btnStart = document.getElementById('btn-start');
+
+  const roundLabel = document.getElementById('round-label');
+  const scoreLabel = document.getElementById('score-label');
+  const artistNowPlaying = document.getElementById('artist-now-playing');
+  const disc = document.getElementById('disc');
+  const timeline = document.getElementById('timeline');
+  const stageCaption = document.getElementById('stage-caption');
+  const btnPlay = document.getElementById('btn-play');
+  const btnSkip = document.getElementById('btn-skip');
+  const guessInput = document.getElementById('guess-input');
+  const suggestionsBox = document.getElementById('suggestions');
+  const resultArea = document.getElementById('result-area');
+
+  let pool = [];          // all tracks fetched {id,title,artist,artwork,preview}
+  let roundOrder = [];    // tracks chosen for this game's rounds (mode: rounds)
+  let infiniteQueue = []; // shuffled tracks queue, refilled as needed (mode: infinite)
+  let mode = 'rounds';    // 'rounds' | 'infinite'
+  let roundsWanted = 5;   // chosen round count when mode === 'rounds'
+  let currentRound = 0;
+  let currentTrack = null;
+  let stageIndex = 0;
+  let score = 0;
+  let history = [];
+  let audio = null;
+  let playTimeout = null;
+  let roundLocked = false;
+
+  const roundsPicker = document.getElementById('rounds-picker');
+  const roundsModeSub = document.getElementById('rounds-mode-sub');
+  const roundsCustomInput = document.getElementById('rounds-custom');
+
+  document.querySelectorAll('.mode-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      roundsPicker.classList.toggle('hidden', mode !== 'rounds');
+    });
+  });
+
+  document.querySelectorAll('.round-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      document.querySelectorAll('.round-chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      roundsWanted = parseInt(chip.dataset.n, 10);
+      roundsCustomInput.value = '';
+      roundsModeSub.textContent = roundsWanted + ' canciones';
+    });
+  });
+
+  roundsCustomInput.addEventListener('input', ()=>{
+    let n = parseInt(roundsCustomInput.value, 10);
+    if(!n || n < 1) return;
+    if(n > 50){ n = 50; roundsCustomInput.value = 50; }
+    roundsWanted = n;
+    document.querySelectorAll('.round-chip').forEach(c=>c.classList.remove('active'));
+    roundsModeSub.textContent = roundsWanted + ' canciones';
+  });
+
+  document.querySelectorAll('.artist-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      queryInput.value = chip.dataset.q;
+      startGame();
+    });
+  });
+  btnStart.addEventListener('click', startGame);
+  queryInput.addEventListener('keydown', e=>{ if(e.key==='Enter') startGame(); });
+
+  document.getElementById('btn-end').addEventListener('click', ()=>{
+    if(history.length === 0 && roundLocked === false && currentRound <= 1){
+      // nothing played yet, just bail back to start
+      resetToStart();
+      return;
+    }
+    showFinal();
+  });
+
+  function resetToStart(){
+    clearTimeout(playTimeout);
+    if(audio) audio.pause();
+    screenGame.classList.add('hidden');
+    screenFinal.classList.add('hidden');
+    screenStart.classList.remove('hidden');
+    btnStart.disabled = false;
+  }
+
+  async function startGame(){
+    const q = queryInput.value.trim();
+    if(!q){ setStatus('Escribí el nombre de un artista, o tocá uno de los ejemplos.', true); return; }
+    setStatus('Buscando al artista "' + q + '"...', false);
+    btnStart.disabled = true;
+    try{
+      const { tracks, matchedName } = await fetchArtistSongs(q);
+      if(tracks.length < 4){
+        setStatus('No encontré suficientes canciones con audio de "' + q + '". Probá escribiendo el nombre completo del artista.', true);
+        btnStart.disabled = false;
+        return;
+      }
+      pool = tracks;
+      score = 0;
+      history = [];
+      currentRound = 0;
+      infiniteQueue = [];
+      roundOrder = buildRoundOrder(roundsWanted, pool);
+      artistNowPlaying.textContent = 'Jugando con: ' + matchedName;
+      screenStart.classList.add('hidden');
+      screenGame.classList.remove('hidden');
+      screenFinal.classList.add('hidden');
+      nextRound();
+    }catch(err){
+      setStatus('No se pudo cargar la lista de canciones (' + (err && err.message ? err.message : 'error de conexión') + '). Probá de nuevo.', true);
+      btnStart.disabled = false;
+    }
+  }
+
+  // Generic JSONP helper — avoids CORS/local-file issues when this file is opened directly in a browser.
+  function jsonp(url){
+    return new Promise((resolve, reject)=>{
+      const cbName = '__itunesCb_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
+      const script = document.createElement('script');
+      let settled = false;
+
+      function cleanup(){
+        delete window[cbName];
+        if(script.parentNode) script.parentNode.removeChild(script);
+        clearTimeout(timer);
+      }
+
+      window[cbName] = function(data){
+        if(settled) return;
+        settled = true;
+        cleanup();
+        resolve(data);
+      };
+
+      script.onerror = function(){
+        if(settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error('no se pudo conectar con iTunes'));
+      };
+
+      const timer = setTimeout(()=>{
+        if(settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error('tiempo de espera agotado'));
+      }, 12000);
+
+      script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
+      document.body.appendChild(script);
+    });
+  }
+
+  function tracksFromResults(results){
+    const seen = new Set();
+    const tracks = [];
+    (results || []).forEach(item=>{
+      if(item.wrapperType && item.wrapperType !== 'track') return; // skip the artist entry itself, etc.
+      if(item.kind && item.kind !== 'song') return;
+      if(!item.previewUrl || !item.trackName || !item.artistName) return;
+      const key = item.trackName.toLowerCase().trim();
+      if(seen.has(key)) return;
+      seen.add(key);
+      tracks.push({
+        id: item.trackId,
+        title: item.trackName,
+        artist: item.artistName,
+        artwork: (item.artworkUrl100||'').replace('100x100','300x300'),
+        preview: item.previewUrl
+      });
+    });
+    return tracks.slice(0, 100);
+  }
+
+  // Step 1: resolve the exact artist behind the typed name, so "Mora" doesn't
+  // pull in unrelated matches like "LoMora" or a song literally titled "Mora".
+  async function resolveArtist(name){
+    const url = 'https://itunes.apple.com/search?term=' + encodeURIComponent(name) +
+                '&entity=musicArtist&attribute=artistTerm&limit=10&country=AR';
+    const data = await jsonp(url);
+    const results = (data && data.results) || [];
+    if(results.length === 0) return null;
+    const exact = results.find(r => r.artistName && r.artistName.toLowerCase() === name.toLowerCase());
+    const chosen = exact || results[0];
+    return { id: chosen.artistId, name: chosen.artistName };
+  }
+
+  // Step 2: pull that exact artist's catalogue by their numeric id — precise, no fuzzy matching.
+  async function songsForArtistId(artistId){
+    const url = 'https://itunes.apple.com/lookup?id=' + artistId +
+                '&entity=song&limit=200&country=AR';
+    const data = await jsonp(url);
+    return tracksFromResults(data && data.results);
+  }
+
+  // Fallback used only if the artist can't be resolved to an id: fuzzy song search by name.
+  async function fuzzySongSearch(name){
+    const url = 'https://itunes.apple.com/search?term=' + encodeURIComponent(name) +
+                '&media=music&entity=song&attribute=artistTerm&limit=100&country=AR';
+    const data = await jsonp(url);
+    return tracksFromResults(data && data.results);
+  }
+
+  async function fetchArtistSongs(name){
+    const artist = await resolveArtist(name);
+    if(artist){
+      const tracks = await songsForArtistId(artist.id);
+      if(tracks.length >= 4){
+        return { tracks, matchedName: artist.name };
+      }
+    }
+    const fallbackTracks = await fuzzySongSearch(name);
+    return { tracks: fallbackTracks, matchedName: name };
+  }
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  // Builds a list of n tracks for "rounds" mode. If n exceeds the pool size,
+  // cycles through fresh shuffles so songs repeat rather than ending the game early.
+  function buildRoundOrder(n, sourcePool){
+    const result = [];
+    while(result.length < n){
+      const batch = shuffle(sourcePool);
+      for(const t of batch){
+        if(result.length >= n) break;
+        result.push(t);
+      }
+    }
+    return result;
+  }
+
+  function setStatus(msg, isErr){
+    startStatus.textContent = msg;
+    startStatus.classList.toggle('err', !!isErr);
+  }
+
+  function nextInfiniteTrack(){
+    if(infiniteQueue.length === 0){
+      infiniteQueue = shuffle(pool);
+    }
+    return infiniteQueue.pop();
+  }
+
+  function nextRound(){
+    currentRound++;
+    if(mode === 'rounds'){
+      if(currentRound > roundOrder.length){
+        showFinal();
+        return;
+      }
+      currentTrack = roundOrder[currentRound-1];
+    }else{
+      currentTrack = nextInfiniteTrack();
+    }
+    stageIndex = 0;
+    roundLocked = false;
+    roundLabel.textContent = (mode === 'rounds')
+      ? ('Ronda ' + currentRound + ' / ' + roundOrder.length)
+      : ('Canción ' + currentRound);
+    scoreLabel.textContent = score + ' pts';
+    guessInput.value = '';
+    guessInput.disabled = false;
+    suggestionsBox.classList.add('hidden');
+    resultArea.innerHTML = '';
+    btnSkip.disabled = false;
+    btnPlay.disabled = false;
+
+    if(audio){ audio.pause(); }
+    audio = new Audio(currentTrack.preview);
+
+    buildTimeline();
+    updateStageCaption();
+  }
+
+  function buildTimeline(){
+    timeline.innerHTML = '';
+    STAGE_DURATIONS.forEach((d, i)=>{
+      const tick = document.createElement('div');
+      tick.className = 'tick';
+      tick.innerHTML = '<div class="fill"></div>';
+      timeline.appendChild(tick);
+    });
+    refreshTimeline();
+  }
+
+  function refreshTimeline(){
+    const ticks = timeline.querySelectorAll('.tick');
+    ticks.forEach((t,i)=>{
+      t.classList.toggle('unlocked', i < stageIndex);
+      t.classList.toggle('active', i === stageIndex);
+    });
+  }
+
+  function updateStageCaption(){
+    const d = STAGE_DURATIONS[stageIndex];
+    stageCaption.textContent = 'Escuchá ' + d + ' segundo' + (d===1?'':'s') + ' y adiviná';
+    refreshTimeline();
+  }
+
+  btnPlay.addEventListener('click', ()=>{
+    if(!audio) return;
+    clearTimeout(playTimeout);
+    audio.currentTime = 0;
+    audio.play();
+    disc.classList.add('playing');
+    const dur = STAGE_DURATIONS[stageIndex] * 1000;
+    playTimeout = setTimeout(()=>{
+      audio.pause();
+      disc.classList.remove('playing');
+    }, dur);
+  });
+
+  btnSkip.addEventListener('click', ()=>{
+    if(roundLocked) return;
+    advanceStage(false);
+  });
+
+  function advanceStage(wasWrong){
+    if(stageIndex >= STAGE_DURATIONS.length - 1){
+      endRound(false);
+      return;
+    }
+    stageIndex++;
+    updateStageCaption();
+    if(wasWrong){
+      flashResult('Esa no era. Se desbloqueó un fragmento más largo.', false, true);
+    }
+  }
+
+  guessInput.addEventListener('input', ()=>{
+    const v = guessInput.value.trim().toLowerCase();
+    if(!v){ suggestionsBox.classList.add('hidden'); return; }
+    const matches = pool.filter(t =>
+      t.title.toLowerCase().includes(v) || t.artist.toLowerCase().includes(v)
+    ).slice(0, 6);
+    if(matches.length === 0){ suggestionsBox.classList.add('hidden'); return; }
+    suggestionsBox.innerHTML = '';
+    matches.forEach(m=>{
+      const row = document.createElement('div');
+      row.className = 'suggestion';
+      row.innerHTML = '<b>'+escapeHtml(m.title)+'</b><span class="artist">'+escapeHtml(m.artist)+'</span>';
+      row.addEventListener('click', ()=> submitGuess(m));
+      suggestionsBox.appendChild(row);
+    });
+    suggestionsBox.classList.remove('hidden');
+  });
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function submitGuess(chosenTrack){
+    if(roundLocked) return;
+    suggestionsBox.classList.add('hidden');
+    guessInput.value = chosenTrack.title;
+    if(chosenTrack.id === currentTrack.id){
+      endRound(true);
+    }else{
+      advanceStage(true);
+    }
+  }
+
+  function endRound(won){
+    roundLocked = true;
+    clearTimeout(playTimeout);
+    if(audio) audio.pause();
+    disc.classList.remove('playing');
+    guessInput.disabled = true;
+    btnSkip.disabled = true;
+    btnPlay.disabled = true;
+
+    const pts = won ? STAGE_POINTS[stageIndex] : 0;
+    score += pts;
+    history.push({title: currentTrack.title, artist: currentTrack.artist, points: pts, won: won});
+
+    const banner = document.createElement('div');
+    banner.className = 'result-banner ' + (won ? 'win' : 'lose');
+    banner.textContent = won ? ('¡Correcto! +' + pts + ' pts') : 'Se acabaron los intentos para esta.';
+
+    const reveal = document.createElement('div');
+    reveal.className = 'reveal';
+    reveal.innerHTML =
+      '<img src="'+escapeHtml(currentTrack.artwork)+'" alt="">' +
+      '<div class="reveal-text">' +
+        '<div class="title">'+escapeHtml(currentTrack.title)+'</div>' +
+        '<div class="artist">'+escapeHtml(currentTrack.artist)+'</div>' +
+      '</div>';
+
+    const btnNext = document.createElement('button');
+    btnNext.className = 'btn-primary';
+    btnNext.style.width = '100%';
+    const isLastFixedRound = (mode === 'rounds' && currentRound >= roundOrder.length);
+    btnNext.textContent = isLastFixedRound ? 'Ver resultado final' : 'Siguiente canción';
+    btnNext.addEventListener('click', nextRound);
+
+    resultArea.innerHTML = '';
+    resultArea.appendChild(banner);
+    resultArea.appendChild(reveal);
+    resultArea.appendChild(btnNext);
+
+    scoreLabel.textContent = score + ' pts';
+  }
+
+  function flashResult(msg, won, transient){
+    resultArea.innerHTML = '<div class="result-banner lose">'+escapeHtml(msg)+'</div>';
+    if(transient){
+      setTimeout(()=>{ if(!roundLocked) resultArea.innerHTML=''; }, 1800);
+    }
+  }
+
+  function showFinal(){
+    screenGame.classList.add('hidden');
+    screenFinal.classList.remove('hidden');
+    document.getElementById('final-score').textContent = score;
+    const histBox = document.getElementById('round-history');
+    histBox.innerHTML = '';
+    history.forEach((h,i)=>{
+      const row = document.createElement('div');
+      row.className = 'history-row';
+      row.innerHTML = '<span>'+(i+1)+'. '+escapeHtml(h.title)+' — '+escapeHtml(h.artist)+'</span><span class="pts">'+(h.won ? ('+'+h.points) : '0')+'</span>';
+      histBox.appendChild(row);
+    });
+  }
+
+  document.getElementById('btn-replay').addEventListener('click', ()=>{
+    screenFinal.classList.add('hidden');
+    screenStart.classList.remove('hidden');
+    btnStart.disabled = false;
+    setStatus('', false);
+  });
+
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('.guess-box')){
+      suggestionsBox.classList.add('hidden');
+    }
+  });
+})();
+</script>
+</body>
+</html>
