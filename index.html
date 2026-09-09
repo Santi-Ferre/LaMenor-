@@ -572,7 +572,7 @@
   // ==== CONFIGURACIÓN DEL RANKING GLOBAL ====
   // Pegá acá la URL de tu Realtime Database de Firebase (instrucciones en el chat).
   // Ejemplo: "https://tu-proyecto-default-rtdb.firebaseio.com"
-  const FIREBASE_DB_URL = "";
+  const FIREBASE_DB_URL = "https://lamenor-95575-default-rtdb.firebaseio.com";
 
   const screenStart = document.getElementById('screen-start');
   const screenGame = document.getElementById('screen-game');
@@ -612,9 +612,11 @@
   let difficulty = 'normal'; // 'easy' | 'normal' | 'hard'
   let gameType = 'single';   // 'single' | 'party'
   let partyArtists = [];     // artist names added for Modo Fiesta
-  let currentArtistKey = '';
+  let currentArtistBaseKey = '';
   let currentArtistDisplayName = '';
   let scoreSavedThisGame = false;
+  let sessionStartTime = 0;
+  let sessionElapsedSeconds = 0;
   let currentRound = 0;
   let currentTrack = null;
   let stageIndex = 0;
@@ -742,12 +744,26 @@
     roundOrder = buildRoundOrder(roundsWanted, pool);
     artistNowPlaying.textContent = 'Jugando con: ' + displayName;
     currentArtistDisplayName = displayName;
-    currentArtistKey = key;
+    currentArtistBaseKey = key;
     scoreSavedThisGame = false;
+    sessionStartTime = Date.now();
     screenStart.classList.add('hidden');
     screenGame.classList.remove('hidden');
     screenFinal.classList.add('hidden');
     nextRound();
+  }
+
+  // The ranking is split by how the round was played (fixed round count, or infinite),
+  // so a 5-round game and a 50-round game don't compete against each other.
+  function currentRankingKey(){
+    const suffix = (mode === 'rounds') ? ('-r' + roundsWanted) : '-infinito';
+    return currentArtistBaseKey + suffix;
+  }
+
+  function formatTime(totalSeconds){
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return m + ':' + String(s).padStart(2, '0');
   }
 
   function slugify(name){
@@ -1164,7 +1180,9 @@
   function showFinal(){
     screenGame.classList.add('hidden');
     screenFinal.classList.remove('hidden');
+    sessionElapsedSeconds = sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1000) : 0;
     document.getElementById('final-score').textContent = score;
+    document.querySelector('.score-sub').textContent = 'puntos en total · tiempo ' + formatTime(sessionElapsedSeconds);
     const histBox = document.getElementById('round-history');
     histBox.innerHTML = '';
     history.forEach((h,i)=>{
@@ -1182,16 +1200,17 @@
     return FIREBASE_DB_URL.replace(/\/$/, '') + path;
   }
 
-  async function loadRanking(artistKey){
-    const res = await fetch(rankingUrl('/rankings/' + artistKey + '.json?orderBy="score"&limitToLast=10'));
+  async function loadRanking(rankingKey){
+    const res = await fetch(rankingUrl('/rankings/' + rankingKey + '.json?orderBy="score"&limitToLast=50'));
     if(!res.ok) throw new Error('no se pudo leer el ranking');
     const data = await res.json();
     if(!data) return [];
-    return Object.values(data).sort((a,b)=> b.score - a.score);
+    // Sort by score first; for ties, faster time wins.
+    return Object.values(data).sort((a,b)=> (b.score - a.score) || ((a.time||9e9) - (b.time||9e9))).slice(0, 10);
   }
 
-  async function submitScore(artistKey, entry){
-    const res = await fetch(rankingUrl('/rankings/' + artistKey + '.json'), {
+  async function submitScore(rankingKey, entry){
+    const res = await fetch(rankingUrl('/rankings/' + rankingKey + '.json'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry)
@@ -1201,18 +1220,19 @@
 
   function renderRankingList(entries){
     rankingList.innerHTML = '';
+    const modeLabel = (mode === 'rounds') ? (roundsWanted + ' rondas') : 'modo infinito';
     if(entries.length === 0){
-      rankingList.innerHTML = '<div class="status">Todavía nadie jugó a ' + escapeHtml(currentArtistDisplayName) + '. ¡Sé el primero!</div>';
+      rankingList.innerHTML = '<div class="status">Todavía nadie jugó a ' + escapeHtml(currentArtistDisplayName) + ' (' + modeLabel + '). ¡Sé el primero!</div>';
       return;
     }
     const title = document.createElement('div');
     title.className = 'ranking-title';
-    title.textContent = 'Ranking de ' + currentArtistDisplayName;
+    title.textContent = 'Ranking · ' + currentArtistDisplayName + ' · ' + modeLabel;
     rankingList.appendChild(title);
     entries.forEach((e,i)=>{
       const row = document.createElement('div');
       row.className = 'ranking-row';
-      row.innerHTML = '<span class="pos">'+(i+1)+'</span><span class="name">'+escapeHtml(e.name||'Anónimo')+'</span><span class="pts">'+e.score+' pts</span>';
+      row.innerHTML = '<span class="pos">'+(i+1)+'</span><span class="name">'+escapeHtml(e.name||'Anónimo')+'</span><span class="pts">'+formatTime(e.time||0)+'</span><span class="pts">'+e.score+' pts</span>';
       rankingList.appendChild(row);
     });
   }
@@ -1226,40 +1246,50 @@
     }
     rankingSubmitBox.classList.remove('hidden');
     playerNameInput.value = '';
+    playerNameInput.disabled = false;
     btnSubmitScore.disabled = false;
+    setTimeout(()=> playerNameInput.focus(), 50);
     rankingList.innerHTML = '<div class="status">Cargando ranking...</div>';
     try{
-      const entries = await loadRanking(currentArtistKey);
+      const entries = await loadRanking(currentRankingKey());
       renderRankingList(entries);
     }catch(err){
       rankingList.innerHTML = '<div class="status err">No se pudo cargar el ranking.</div>';
     }
   }
 
-  btnSubmitScore.addEventListener('click', async ()=>{
+  async function saveScoreToRanking(){
     if(scoreSavedThisGame) return;
     const name = playerNameInput.value.trim();
     if(!name){ rankingStatus.textContent = 'Escribí tu nombre primero.'; rankingStatus.classList.add('err'); return; }
     btnSubmitScore.disabled = true;
+    playerNameInput.disabled = true;
     rankingStatus.classList.remove('err');
     rankingStatus.textContent = 'Guardando...';
     try{
-      await submitScore(currentArtistKey, {
+      await submitScore(currentRankingKey(), {
         name: name.slice(0, 20),
         score: score,
+        time: sessionElapsedSeconds,
         mode: mode,
         rounds: mode === 'rounds' ? roundsWanted : history.length,
         date: Date.now()
       });
       scoreSavedThisGame = true;
       rankingStatus.textContent = '¡Puntaje guardado!';
-      const entries = await loadRanking(currentArtistKey);
+      const entries = await loadRanking(currentRankingKey());
       renderRankingList(entries);
     }catch(err){
       rankingStatus.textContent = 'No se pudo guardar. Probá de nuevo.';
       rankingStatus.classList.add('err');
       btnSubmitScore.disabled = false;
+      playerNameInput.disabled = false;
     }
+  }
+
+  btnSubmitScore.addEventListener('click', saveScoreToRanking);
+  playerNameInput.addEventListener('keydown', e=>{
+    if(e.key === 'Enter'){ e.preventDefault(); saveScoreToRanking(); }
   });
 
   document.getElementById('btn-replay').addEventListener('click', ()=>{
