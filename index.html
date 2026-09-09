@@ -1201,7 +1201,9 @@
   }
 
   async function loadRanking(rankingKey){
-    const res = await fetch(rankingUrl('/rankings/' + rankingKey + '.json?orderBy="score"&limitToLast=50'));
+    // Fetch the whole node and sort client-side — simpler and avoids issues
+    // with Firebase's orderBy query syntax over plain fetch.
+    const res = await fetch(rankingUrl('/rankings/' + rankingKey + '.json'));
     if(!res.ok) throw new Error('no se pudo leer el ranking');
     const data = await res.json();
     if(!data) return [];
@@ -1275,15 +1277,23 @@
         rounds: mode === 'rounds' ? roundsWanted : history.length,
         date: Date.now()
       });
-      scoreSavedThisGame = true;
-      rankingStatus.textContent = '¡Puntaje guardado!';
-      const entries = await loadRanking(currentRankingKey());
-      renderRankingList(entries);
     }catch(err){
+      // The save itself failed — this is the only case where we tell the user it wasn't saved.
       rankingStatus.textContent = 'No se pudo guardar. Probá de nuevo.';
       rankingStatus.classList.add('err');
       btnSubmitScore.disabled = false;
       playerNameInput.disabled = false;
+      return;
+    }
+    scoreSavedThisGame = true;
+    rankingStatus.textContent = '¡Puntaje guardado!';
+    // Refreshing the visible list is best-effort: if it fails, the save already succeeded,
+    // so we don't want to tell the user otherwise.
+    try{
+      const entries = await loadRanking(currentRankingKey());
+      renderRankingList(entries);
+    }catch(err){
+      // leave the previous list as-is; the score is safely saved regardless.
     }
   }
 
