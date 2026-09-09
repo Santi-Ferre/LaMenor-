@@ -112,6 +112,21 @@
   }
   .chip:hover{ color: var(--cream); border-color: var(--gold-dim); }
 
+  .party-artist-chip{
+    display:inline-flex;
+    align-items:center;
+    gap: 8px;
+    background: rgba(244,201,93,0.12);
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+  .party-artist-chip .remove-x{
+    cursor:pointer;
+    font-weight:700;
+    opacity: 0.8;
+  }
+  .party-artist-chip .remove-x:hover{ opacity:1; }
+
   .mode-toggle{
     display:flex;
     gap: 8px;
@@ -435,6 +450,12 @@
 
   <!-- START SCREEN -->
   <div class="card" id="screen-start">
+    <label class="field-label">Tipo de partida</label>
+    <div class="mode-toggle">
+      <button class="mode-btn game-type-btn active" data-type="single">Un artista<span class="mode-sub">Elegí a alguien puntual</span></button>
+      <button class="mode-btn game-type-btn" data-type="party">Modo Fiesta 🎉<span class="mode-sub">Mezclá varios artistas</span></button>
+    </div>
+
     <label class="field-label">Modo de juego</label>
     <div class="mode-toggle">
       <button class="mode-btn active" data-mode="rounds">Por rondas<span class="mode-sub" id="rounds-mode-sub">5 canciones</span></button>
@@ -464,19 +485,32 @@
       <button class="mode-btn diff-btn" data-diff="hard">Difícil<span class="mode-sub">Todo: remixes, en vivo, rarezas</span></button>
     </div>
 
-    <label class="field-label" for="query">Escribí el nombre de un artista</label>
-    <div class="search-row">
-      <input type="text" id="query" placeholder="Ej: Bizarrap, Tini, Soda Stereo, Bad Bunny..." />
-      <button class="btn-primary" id="btn-start">Buscar</button>
+    <div id="single-picker">
+      <label class="field-label" for="query">Escribí el nombre de un artista</label>
+      <div class="search-row">
+        <input type="text" id="query" placeholder="Ej: Bizarrap, Tini, Soda Stereo, Bad Bunny..." />
+        <button class="btn-primary" id="btn-start">Buscar</button>
+      </div>
+      <div class="chips">
+        <button class="chip artist-chip" data-q="Duki">Duki</button>
+        <button class="chip artist-chip" data-q="Tini">Tini</button>
+        <button class="chip artist-chip" data-q="Bizarrap">Bizarrap</button>
+        <button class="chip artist-chip" data-q="Soda Stereo">Soda Stereo</button>
+        <button class="chip artist-chip" data-q="Bad Bunny">Bad Bunny</button>
+        <button class="chip artist-chip" data-q="Shakira">Shakira</button>
+      </div>
     </div>
-    <div class="chips">
-      <button class="chip artist-chip" data-q="Duki">Duki</button>
-      <button class="chip artist-chip" data-q="Tini">Tini</button>
-      <button class="chip artist-chip" data-q="Bizarrap">Bizarrap</button>
-      <button class="chip artist-chip" data-q="Soda Stereo">Soda Stereo</button>
-      <button class="chip artist-chip" data-q="Bad Bunny">Bad Bunny</button>
-      <button class="chip artist-chip" data-q="Shakira">Shakira</button>
+
+    <div id="party-picker" class="hidden">
+      <label class="field-label" for="party-artist-input">Agregá artistas para la fiesta (mínimo 2)</label>
+      <div class="search-row">
+        <input type="text" id="party-artist-input" placeholder="Nombre del artista" />
+        <button class="btn-primary" id="btn-party-add">Agregar</button>
+      </div>
+      <div class="chips" id="party-artist-list"></div>
+      <button class="btn-primary" id="btn-party-start" style="width:100%; margin-top:14px;">Empezar fiesta</button>
     </div>
+
     <div class="status" id="start-status"></div>
   </div>
 
@@ -555,6 +589,12 @@
   const rankingStatus = document.getElementById('ranking-status');
   const rankingList = document.getElementById('ranking-list');
   const rankingSubmitBox = document.getElementById('ranking-submit-box');
+  const singlePicker = document.getElementById('single-picker');
+  const partyPicker = document.getElementById('party-picker');
+  const partyArtistInput = document.getElementById('party-artist-input');
+  const btnPartyAdd = document.getElementById('btn-party-add');
+  const partyArtistList = document.getElementById('party-artist-list');
+  const btnPartyStart = document.getElementById('btn-party-start');
   const disc = document.getElementById('disc');
   const timeline = document.getElementById('timeline');
   const stageCaption = document.getElementById('stage-caption');
@@ -570,6 +610,8 @@
   let mode = 'rounds';    // 'rounds' | 'infinite'
   let roundsWanted = 5;   // chosen round count when mode === 'rounds'
   let difficulty = 'normal'; // 'easy' | 'normal' | 'hard'
+  let gameType = 'single';   // 'single' | 'party'
+  let partyArtists = [];     // artist names added for Modo Fiesta
   let currentArtistKey = '';
   let currentArtistDisplayName = '';
   let scoreSavedThisGame = false;
@@ -603,6 +645,47 @@
       difficulty = btn.dataset.diff;
     });
   });
+
+  document.querySelectorAll('.game-type-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.game-type-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      gameType = btn.dataset.type;
+      singlePicker.classList.toggle('hidden', gameType !== 'single');
+      partyPicker.classList.toggle('hidden', gameType !== 'party');
+      setStatus('', false);
+    });
+  });
+
+  function renderPartyArtistList(){
+    partyArtistList.innerHTML = '';
+    partyArtists.forEach((name, i)=>{
+      const chip = document.createElement('span');
+      chip.className = 'chip party-artist-chip';
+      chip.innerHTML = escapeHtml(name) + ' <span class="remove-x" data-i="'+i+'">✕</span>';
+      chip.querySelector('.remove-x').addEventListener('click', ()=>{
+        partyArtists.splice(i, 1);
+        renderPartyArtistList();
+      });
+      partyArtistList.appendChild(chip);
+    });
+  }
+
+  function addPartyArtist(){
+    const name = partyArtistInput.value.trim();
+    if(!name) return;
+    if(partyArtists.some(a => normalize(a) === normalize(name))){
+      partyArtistInput.value = '';
+      return;
+    }
+    partyArtists.push(name);
+    partyArtistInput.value = '';
+    renderPartyArtistList();
+  }
+
+  btnPartyAdd.addEventListener('click', addPartyArtist);
+  partyArtistInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addPartyArtist(); } });
+  btnPartyStart.addEventListener('click', startPartyGame);
 
   document.querySelectorAll('.round-chip').forEach(chip=>{
     chip.addEventListener('click', ()=>{
@@ -650,6 +733,27 @@
     btnStart.disabled = false;
   }
 
+  function beginGameWithPool(tracks, displayName, key){
+    pool = filterByDifficulty(tracks, difficulty);
+    score = 0;
+    history = [];
+    currentRound = 0;
+    infiniteQueue = [];
+    roundOrder = buildRoundOrder(roundsWanted, pool);
+    artistNowPlaying.textContent = 'Jugando con: ' + displayName;
+    currentArtistDisplayName = displayName;
+    currentArtistKey = key;
+    scoreSavedThisGame = false;
+    screenStart.classList.add('hidden');
+    screenGame.classList.remove('hidden');
+    screenFinal.classList.add('hidden');
+    nextRound();
+  }
+
+  function slugify(name){
+    return normalize(name).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'artista';
+  }
+
   async function startGame(){
     const q = queryInput.value.trim();
     if(!q){ setStatus('Escribí el nombre de un artista, o tocá uno de los ejemplos.', true); return; }
@@ -662,23 +766,46 @@
         btnStart.disabled = false;
         return;
       }
-      pool = filterByDifficulty(tracks, difficulty);
-      score = 0;
-      history = [];
-      currentRound = 0;
-      infiniteQueue = [];
-      roundOrder = buildRoundOrder(roundsWanted, pool);
-      artistNowPlaying.textContent = 'Jugando con: ' + matchedName;
-      currentArtistDisplayName = matchedName;
-      currentArtistKey = normalize(matchedName).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'artista';
-      scoreSavedThisGame = false;
-      screenStart.classList.add('hidden');
-      screenGame.classList.remove('hidden');
-      screenFinal.classList.add('hidden');
-      nextRound();
+      beginGameWithPool(tracks, matchedName, slugify(matchedName));
     }catch(err){
       setStatus('No se pudo cargar la lista de canciones (' + (err && err.message ? err.message : 'error de conexión') + '). Probá de nuevo.', true);
       btnStart.disabled = false;
+    }
+  }
+
+  async function startPartyGame(){
+    if(partyArtists.length < 2){
+      setStatus('Agregá al menos 2 artistas para el modo Fiesta.', true);
+      return;
+    }
+    setStatus('Armando la fiesta con ' + partyArtists.join(', ') + '...', false);
+    btnPartyStart.disabled = true;
+    try{
+      const results = await Promise.all(partyArtists.map(name => fetchArtistSongs(name).catch(()=>({tracks:[], matchedName:name}))));
+      const seenIds = new Set();
+      const merged = [];
+      const namesFound = [];
+      results.forEach(r=>{
+        if(r.tracks.length === 0) return;
+        namesFound.push(r.matchedName);
+        r.tracks.forEach(t=>{
+          if(seenIds.has(t.id)) return;
+          seenIds.add(t.id);
+          merged.push(t);
+        });
+      });
+      if(merged.length < 4){
+        setStatus('No encontré suficientes canciones para esa combinación de artistas. Probá con otros nombres.', true);
+        btnPartyStart.disabled = false;
+        return;
+      }
+      const displayName = namesFound.join(', ');
+      const key = 'fiesta-' + namesFound.map(slugify).sort().join('-');
+      beginGameWithPool(merged, displayName, key);
+      btnPartyStart.disabled = false;
+    }catch(err){
+      setStatus('No se pudo armar la fiesta (' + (err && err.message ? err.message : 'error de conexión') + '). Probá de nuevo.', true);
+      btnPartyStart.disabled = false;
     }
   }
 
