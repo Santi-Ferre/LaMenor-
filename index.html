@@ -955,6 +955,14 @@
   const COLLAB_RE = /\(feat\.|\bfeat\.|\bft\.|\bfeaturing\b|\bwith\b|\bcon\b\s/i;
   const ALT_VERSION_RE = /\bremix\b|\blive\b|\ben vivo\b|acoustic|acustic|\bversion\b|\bversión\b|\bedit\b|\bdemo\b|\bmix\)|\bkaraoke\b|\binstrumental\b/i;
 
+  // How many songs to try to gather per difficulty level. iTunes caps a single
+  // request at 200, so "hard" merges a second query to reach further when possible.
+  function songTargetForDifficulty(){
+    if(difficulty === 'easy') return 100;
+    if(difficulty === 'normal') return 200;
+    return 300; // hard: aim for 300, or the max the artist actually has available
+  }
+
   function tracksFromResults(results){
     const seen = new Set();
     const tracks = [];
@@ -976,7 +984,20 @@
         isAltVersion: ALT_VERSION_RE.test(title)
       });
     });
-    return tracks.slice(0, 100);
+    return tracks; // caller decides how many to keep
+  }
+
+  function mergeUniqueTracks(base, extra){
+    const seenIds = new Set(base.map(t => t.id));
+    const seenTitles = new Set(base.map(t => t.title.toLowerCase().trim()));
+    extra.forEach(t=>{
+      const titleKey = t.title.toLowerCase().trim();
+      if(seenIds.has(t.id) || seenTitles.has(titleKey)) return;
+      seenIds.add(t.id);
+      seenTitles.add(titleKey);
+      base.push(t);
+    });
+    return base;
   }
 
   function filterByDifficulty(tracks, level){
@@ -1005,6 +1026,7 @@
   }
 
   // Step 2: pull that exact artist's catalogue by their numeric id — precise, no fuzzy matching.
+  // 200 is the maximum iTunes allows per request.
   async function songsForArtistId(artistId){
     const url = 'https://itunes.apple.com/lookup?id=' + artistId +
                 '&entity=song&limit=200&country=AR';
@@ -1012,24 +1034,35 @@
     return tracksFromResults(data && data.results);
   }
 
-  // Fallback used only if the artist can't be resolved to an id: fuzzy song search by name.
+  // Secondary/fallback source: fuzzy song search by name (also capped at 200 by iTunes).
+  // Used as a fallback when the artist can't be resolved to an id, and as a second
+  // source on "hard" difficulty to gather more songs than a single lookup call allows.
   async function fuzzySongSearch(name){
     const url = 'https://itunes.apple.com/search?term=' + encodeURIComponent(name) +
-                '&media=music&entity=song&attribute=artistTerm&limit=100&country=AR';
+                '&media=music&entity=song&attribute=artistTerm&limit=200&country=AR';
     const data = await jsonp(url);
     return tracksFromResults(data && data.results);
   }
 
   async function fetchArtistSongs(name){
+    const target = songTargetForDifficulty();
     const artist = await resolveArtist(name);
     if(artist){
-      const tracks = await songsForArtistId(artist.id);
+      let tracks = await songsForArtistId(artist.id);
       if(tracks.length >= 4){
-        return { tracks, matchedName: artist.name };
+        // On "hard", a single call (max 200) often isn't enough to reach 300 —
+        // merge in a second query to gather more, if the artist has that many.
+        if(difficulty === 'hard' && tracks.length < target){
+          try{
+            const extra = await fuzzySongSearch(artist.name);
+            tracks = mergeUniqueTracks(tracks, extra);
+          }catch(e){ /* keep what we already have */ }
+        }
+        return { tracks: tracks.slice(0, target), matchedName: artist.name };
       }
     }
     const fallbackTracks = await fuzzySongSearch(name);
-    return { tracks: fallbackTracks, matchedName: name };
+    return { tracks: fallbackTracks.slice(0, target), matchedName: name };
   }
 
   function shuffle(arr){
