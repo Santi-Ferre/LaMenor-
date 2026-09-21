@@ -96,6 +96,18 @@
     font-size: 15px;
   }
   .btn-primary:disabled{ opacity: 0.5; cursor: default; }
+  .btn-secondary{
+    background: var(--surface-2);
+    color: var(--cream);
+    border: 1px solid #3a3045;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    width: 100%;
+    margin-top: 10px;
+  }
+  .btn-secondary:hover{ border-color: var(--gold-dim); color: var(--gold); }
   .chips{
     display:flex;
     flex-wrap: wrap;
@@ -499,6 +511,7 @@
         <button class="chip artist-chip" data-q="Bad Bunny">Bad Bunny</button>
         <button class="chip artist-chip" data-q="Shakira">Shakira</button>
       </div>
+      <button class="btn-secondary" id="btn-view-ranking-single">Ver ranking</button>
     </div>
 
     <div id="party-picker" class="hidden">
@@ -509,6 +522,12 @@
       </div>
       <div class="chips" id="party-artist-list"></div>
       <button class="btn-primary" id="btn-party-start" style="width:100%; margin-top:14px;">Empezar fiesta</button>
+      <button class="btn-secondary" id="btn-view-ranking-party">Ver ranking</button>
+    </div>
+
+    <div class="ranking-box hidden" id="ranking-preview-box">
+      <div id="ranking-preview-content"></div>
+      <button class="btn-secondary" id="btn-close-ranking-preview">Cerrar ranking</button>
     </div>
 
     <div class="status" id="start-status"></div>
@@ -595,6 +614,11 @@
   const btnPartyAdd = document.getElementById('btn-party-add');
   const partyArtistList = document.getElementById('party-artist-list');
   const btnPartyStart = document.getElementById('btn-party-start');
+  const btnViewRankingSingle = document.getElementById('btn-view-ranking-single');
+  const btnViewRankingParty = document.getElementById('btn-view-ranking-party');
+  const rankingPreviewBox = document.getElementById('ranking-preview-box');
+  const rankingPreviewContent = document.getElementById('ranking-preview-content');
+  const btnCloseRankingPreview = document.getElementById('btn-close-ranking-preview');
   const disc = document.getElementById('disc');
   const timeline = document.getElementById('timeline');
   const stageCaption = document.getElementById('stage-caption');
@@ -655,6 +679,7 @@
       gameType = btn.dataset.type;
       singlePicker.classList.toggle('hidden', gameType !== 'single');
       partyPicker.classList.toggle('hidden', gameType !== 'party');
+      rankingPreviewBox.classList.add('hidden');
       setStatus('', false);
     });
   });
@@ -688,6 +713,60 @@
   btnPartyAdd.addEventListener('click', addPartyArtist);
   partyArtistInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addPartyArtist(); } });
   btnPartyStart.addEventListener('click', startPartyGame);
+
+  btnCloseRankingPreview.addEventListener('click', ()=>{
+    rankingPreviewBox.classList.add('hidden');
+  });
+
+  btnViewRankingSingle.addEventListener('click', async ()=>{
+    if(!FIREBASE_DB_URL){
+      setStatus('El ranking global todavía no está configurado para este sitio.', true);
+      return;
+    }
+    const q = queryInput.value.trim();
+    if(!q){ setStatus('Escribí el nombre de un artista para ver su ranking.', true); return; }
+    setStatus('Buscando el ranking de "' + q + '"...', false);
+    btnViewRankingSingle.disabled = true;
+    try{
+      const artist = await resolveArtist(q);
+      const displayName = artist ? artist.name : q;
+      const key = buildRankingKey(slugify(displayName));
+      const entries = await loadRanking(key);
+      renderRankingInto(rankingPreviewContent, entries, displayName, modeLabelText(), diffLabelText());
+      rankingPreviewBox.classList.remove('hidden');
+      setStatus('', false);
+    }catch(err){
+      setStatus('No se pudo cargar el ranking. Probá de nuevo.', true);
+    }
+    btnViewRankingSingle.disabled = false;
+  });
+
+  btnViewRankingParty.addEventListener('click', async ()=>{
+    if(!FIREBASE_DB_URL){
+      setStatus('El ranking global todavía no está configurado para este sitio.', true);
+      return;
+    }
+    if(partyArtists.length < 2){
+      setStatus('Agregá al menos 2 artistas para ver el ranking de esa fiesta.', true);
+      return;
+    }
+    setStatus('Buscando el ranking de la fiesta...', false);
+    btnViewRankingParty.disabled = true;
+    try{
+      const resolved = await Promise.all(partyArtists.map(name =>
+        resolveArtist(name).then(a => a ? a.name : name).catch(()=> name)
+      ));
+      const displayName = resolved.join(', ');
+      const key = buildRankingKey('fiesta-' + resolved.map(slugify).sort().join('-'));
+      const entries = await loadRanking(key);
+      renderRankingInto(rankingPreviewContent, entries, displayName, modeLabelText(), diffLabelText());
+      rankingPreviewBox.classList.remove('hidden');
+      setStatus('', false);
+    }catch(err){
+      setStatus('No se pudo cargar el ranking. Probá de nuevo.', true);
+    }
+    btnViewRankingParty.disabled = false;
+  });
 
   document.querySelectorAll('.round-chip').forEach(chip=>{
     chip.addEventListener('click', ()=>{
@@ -753,11 +832,20 @@
     nextRound();
   }
 
-  // The ranking is split by how the round was played (fixed round count, or infinite),
-  // so a 5-round game and a 50-round game don't compete against each other.
+  // The ranking is split by how the round was played (fixed round count vs infinite,
+  // and difficulty), so games that aren't really comparable don't compete against each other.
+  function modeLabelText(){
+    return (mode === 'rounds') ? (roundsWanted + ' rondas') : 'modo infinito';
+  }
+  function diffLabelText(){
+    return difficulty === 'easy' ? 'Fácil' : (difficulty === 'hard' ? 'Difícil' : 'Normal');
+  }
+  function buildRankingKey(baseKey){
+    const modeSuffix = (mode === 'rounds') ? ('-r' + roundsWanted) : '-infinito';
+    return baseKey + modeSuffix + '-' + difficulty;
+  }
   function currentRankingKey(){
-    const suffix = (mode === 'rounds') ? ('-r' + roundsWanted) : '-infinito';
-    return currentArtistBaseKey + suffix;
+    return buildRankingKey(currentArtistBaseKey);
   }
 
   function formatTime(totalSeconds){
@@ -1220,23 +1308,26 @@
     if(!res.ok) throw new Error('no se pudo guardar el puntaje');
   }
 
-  function renderRankingList(entries){
-    rankingList.innerHTML = '';
-    const modeLabel = (mode === 'rounds') ? (roundsWanted + ' rondas') : 'modo infinito';
+  function renderRankingInto(container, entries, displayName, modeLabel, diffLabel){
+    container.innerHTML = '';
     if(entries.length === 0){
-      rankingList.innerHTML = '<div class="status">Todavía nadie jugó a ' + escapeHtml(currentArtistDisplayName) + ' (' + modeLabel + '). ¡Sé el primero!</div>';
+      container.innerHTML = '<div class="status">Todavía nadie jugó a ' + escapeHtml(displayName) + ' (' + modeLabel + ' · ' + diffLabel + '). ¡Sé el primero!</div>';
       return;
     }
     const title = document.createElement('div');
     title.className = 'ranking-title';
-    title.textContent = 'Ranking · ' + currentArtistDisplayName + ' · ' + modeLabel;
-    rankingList.appendChild(title);
+    title.textContent = 'Ranking · ' + displayName + ' · ' + modeLabel + ' · ' + diffLabel;
+    container.appendChild(title);
     entries.forEach((e,i)=>{
       const row = document.createElement('div');
       row.className = 'ranking-row';
       row.innerHTML = '<span class="pos">'+(i+1)+'</span><span class="name">'+escapeHtml(e.name||'Anónimo')+'</span><span class="pts">'+formatTime(e.time||0)+'</span><span class="pts">'+e.score+' pts</span>';
-      rankingList.appendChild(row);
+      container.appendChild(row);
     });
+  }
+
+  function renderRankingList(entries){
+    renderRankingInto(rankingList, entries, currentArtistDisplayName, modeLabelText(), diffLabelText());
   }
 
   async function refreshRankingUI(){
